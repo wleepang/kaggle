@@ -1,328 +1,113 @@
+""" Now that the user can read in a file this creates a model which uses the price, class and gender
+Author : AstroDave
+Date : 18th September 2012
+Revised : 28 March 2014
+
+"""
 
 
+import csv as csv
+import numpy as np
 
-<!DOCTYPE html>
+csv_file_object = csv.reader(open('train.csv', 'rb'))       # Load in the csv file
+header = csv_file_object.next()                             # Skip the fist line as it is a header
+data=[]                                                     # Create a variable to hold the data
 
-<!--[if lt IE 7 ]><html class="ie ie6 lte7 lte8 lte9"><![endif]-->
-<!--[if IE 7 ]><html class="ie ie7 lte7 lte8 lte9"><![endif]-->
-<!--[if IE 8 ]><html class="ie ie8 lte8 lte9"><![endif]-->
-<!--[if IE 9 ]><html class="ie ie9 lte9"><![endif]-->
-<!--[if (gt IE 9)|!(IE)]><!--><html ><!--<![endif]-->
+for row in csv_file_object:                 # Skip through each row in the csv file
+    data.append(row)                        # adding each row to the data variable
+data = np.array(data)                       # Then convert from a list to an array
 
-<head>
-    <link href='//fonts.googleapis.com/css?family=Merriweather:400,700|Open+Sans:300,400italic,700italic,400,700' rel='stylesheet' type='text/css'> 
+# In order to analyse the price column I need to bin up that data
+# here are my binning parameters, the problem we face is some of the fares are very large
+# So we can either have a lot of bins with nothing in them or we can just lose some
+# information by just considering that anythng over 39 is simply in the last bin.
+# So we add a ceiling
+fare_ceiling = 40
+# then modify the data in the Fare column to = 39, if it is greater or equal to the ceiling
+data[ data[0::,9].astype(np.float) >= fare_ceiling, 9 ] = fare_ceiling - 1.0
 
-    
-    <link rel="stylesheet" href="/content/v/1fb55cec3f8f/shared/css/font-awesome.min.css">
-
-    
-    
-    <title>Login | Kaggle</title>
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-    <meta name="robots" content="index, follow" />
-    <link href="/content/v/4e3f994e938b/kaggle/favicon.ico" rel="shortcut icon" type="image/x-icon" />
-
-    
-        <meta name="keywords" content="Kaggle, data science, datasets, public data, crowdsourced analytics, competitions, tutorials, scripts, Python, R, InClass, jobs board" />
-            <meta name="description" content="Kaggle is your home for data science. Learn new skills, build your career, collaborate with other data scientists, and compete in world-class machine learning challenges." />
-
-            <link rel="stylesheet" href="/content/v/397d8f5c14ef/shared/css/base.less" type="text/css" />
-        <link rel="stylesheet" href="/content/v/e1cd6968c0d2/kaggle/css/kaggle-site.less" type="text/css" />
-
-        <script type="text/javascript" src="/content/v/47b68dce8cb6/shared/js/jquery-1.7.2.min.js"></script>
-            <script type="text/javascript" src="/content/v/7846b5904b60/shared/js/jquery-ui-1.9.2.min.js"></script>
-
-    
-        <script type="text/javascript" src="/content/v/a60ecf3c5c7d/shared/js/kaggle.min.js"></script>
-        <script type="text/javascript">
-            
-            Kaggle.Current.siteId = 1;
-                    </script>
-
-    
-    <!--[if (gte IE 6)&(lte IE 8)]>
-        <script type="text/javascript" src="/content/v/f1f17fea7cee/shared/js/ie/selectivizr.min.js"></script>
-    <![endif]-->
-
-    
-                                        
-                                                                
-                    <link rel="apple-touch-icon" href="/content/v/1e4cdaa83f46/kaggle/img/apple-touch-icon.png" />
+fare_bracket_size = 10
+number_of_price_brackets = fare_ceiling / fare_bracket_size
+number_of_classes = 3                             # I know there were 1st, 2nd and 3rd classes on board.
+number_of_classes = len(np.unique(data[0::,2]))   # But it's better practice to calculate this from the Pclass directly:
+                                                  # just take the length of an array of UNIQUE values in column index 2
 
 
-    
-    <!--[if lt IE 9]>
-        <script src="//html5shim.googlecode.com/svn/trunk/html5.js"></script>
-    <![endif]-->
-    
-    
+# This reference matrix will show the proportion of survivors as a sorted table of
+# gender, class and ticket fare.
+# First initialize it with all zeros
+survival_table = np.zeros([2,number_of_classes,number_of_price_brackets],float)
 
+# I can now find the stats of all the women and men on board
+for i in xrange(number_of_classes):
+    for j in xrange(number_of_price_brackets):
 
-    <script>
-          window.intercomSettings = {
-            app_id: "koj6gxx6"
-          };
-    </script>
-<script>(function(){var w=window;var ic=w.Intercom;if(typeof ic==="function"){ic('reattach_activator');ic('update',intercomSettings);}else{var d=document;var i=function(){i.c(arguments)};i.q=[];i.c=function(args){i.q.push(args)};w.Intercom=i;function l(){var s=d.createElement('script');s.type='text/javascript';s.async=true;s.src='https://widget.intercom.io/widget/koj6gxx6';var x=d.getElementsByTagName('script')[0];x.parentNode.insertBefore(s,x);}if(w.attachEvent){w.attachEvent('onload',l);}else{w.addEventListener('load',l,false);}}})()</script>
-</head>
-<body class="logged-out    kaggle">
-    <div id="watermark1" class=""></div>
-    <div id="watermark2" class=""></div>
-    
-    <div id="wrap"><!-- needed for sticky footer -->
+        women_only_stats = data[ (data[0::,4] == "female") \
+                                 & (data[0::,2].astype(np.float) == i+1) \
+                                 & (data[0:,9].astype(np.float) >= j*fare_bracket_size) \
+                                 & (data[0:,9].astype(np.float) < (j+1)*fare_bracket_size), 1]
 
+        men_only_stats = data[ (data[0::,4] != "female") \
+                                 & (data[0::,2].astype(np.float) == i+1) \
+                                 & (data[0:,9].astype(np.float) >= j*fare_bracket_size) \
+                                 & (data[0:,9].astype(np.float) < (j+1)*fare_bracket_size), 1]
 
-<div id="menu-open-overlay"></div>
+                                 #if i == 0 and j == 3:
 
-<div id="header2" class="">
-    <div id="header2-inside" class=>
-        <a id="logo" href="/"><img alt="Kaggle" height="86" src="/content/v/9da25a3f126b/kaggle/img/site-logo.png" width="240" /></a>
+        survival_table[0,i,j] = np.mean(women_only_stats.astype(np.float))  # Female stats
+        survival_table[1,i,j] = np.mean(men_only_stats.astype(np.float))    # Male stats
 
-            <ul id="header-ul">
-                <li>
-  <a href="/solutions/competitions">Host</a>
-</li>
-<li>
-  <a href="/competitions">Competitions</a>
-</li>
-<li>
-  <a href="/datasets">Datasets</a>
-</li>
-<li>
-  <a href="/kernels">Kernels</a>
-</li>
-<li>
-  <a href="/jobs">Jobs</a>
-</li>
-<li>
-<a href="">Community &#9662;</a>
-<ul>
-  <li><a href='/users'>User Rankings</a></li>
-  <li><a href='/forums'>Forum</a></li>
-  <li><a href="http://blog.kaggle.com" target="_blank">Blog</a></li>
-  <li><a href='/Wiki'>Wiki</a></li>
-</ul>
-</li><!-- <script>
-  $(function(){
-    if (!$('body.logged-in').length) {
-      $('a.logged-in-only').hide().parent().next().find('a').css('padding-top','10px');
-    }
-  });
-</script> -->
-            </ul>
+# Since in python if it tries to find the mean of an array with nothing in it
+# (such that the denominator is 0), then it returns nan, we can convert these to 0
+# by just saying where does the array not equal the array, and set these to 0.
+survival_table[ survival_table != survival_table ] = 0.
 
-        <script>
-            jQuery(function () {
-                jQuery('#header-ul li:has(ul) > a').click(function (e) {
-                    e.preventDefault();
+# Now I have my proportion of survivors, simply round them such that if <0.5
+# I predict they dont surivive, and if >= 0.5 they do
+survival_table[ survival_table < 0.5 ] = 0
+survival_table[ survival_table >= 0.5 ] = 1
 
-                    jQuery('#header-ul li').not(jQuery(this).parent()).find('ul').removeClass('open');
-                    jQuery(this).parent().find('ul').toggleClass('open');
-                    jQuery('#menu-open-overlay').show();
-                });
+# Now I have my indicator I can read in the test file and write out
+# if a women then survived(1) if a man then did not survived (0)
+# First read in test
+test_file = open('test.csv', 'rb')
+test_file_object = csv.reader(test_file)
+header = test_file_object.next()
 
-                jQuery('#menu-open-overlay').click(function () {
-                    jQuery('#header-ul ul').removeClass('open');
-                    jQuery('#top-bar-signin').hide();
-                    jQuery(this).hide();
-                });
+# Also open the a new file so I can write to it. 
+predictions_file = open("genderclassmodel.csv", "wb")
+predictions_file_object = csv.writer(predictions_file)
+predictions_file_object.writerow(["PassengerId", "Survived"])
 
-            });
-        </script>
+# First thing to do is bin up the price file
+for row in test_file_object:
+    for j in xrange(number_of_price_brackets):
+        # If there is no fare then place the price of the ticket according to class
+        try:
+            row[8] = float(row[8])    # No fare recorded will come up as a string so
+                                      # try to make it a float
+        except:                       # If fails then just bin the fare according to the class
+            bin_fare = 3 - float(row[1])
+            break                     # Break from the loop and move to the next row
+        if row[8] > fare_ceiling:     # Otherwise now test to see if it is higher
+                                      # than the fare ceiling we set earlier
+            bin_fare = number_of_price_brackets - 1
+            break                     # And then break to the next row
 
-        <ul id="header-control">
-                <li id="header-signup"><a href="/account/register"><strong><text>Sign up</text></strong></a></li>
-                <li id="header-login">
-                    <a href="/account/login?returnUrl=%2Faccount%2Flogin%3FReturnUrl%3D%252fc%252ftitanic%252fdownload%252fgenderclassmodel.py" class="login-link">Login</a>
-                </li>
-        </ul>
-            <div id="top-bar-signin">
-                <div id="social-authentication-top">
-    <div id="social-authentication-top-head">
-        Log in<br/>
-        with &mdash;
-    </div>
-    <div id="social-authentication-top-buttons">
-        <a href="/account/authenticate/facebook" class="socialSignIn facebook" title="Log in with Facebook"><img src="/content/v/368347303d78/shared/img/auth-facebook.png" width="36" height="36" alt="Sign up with Facebook" title="Sign up with Facebook" /></a>
-        <a href="/account/authenticate/google" class="socialSignIn google" title="Log in with Google"><img src="/content/v/ace060e512d3/shared/img/auth-google.png" width="36" height="36" alt="Sign up with Google" title="Sign up with Google" /></a>
-        <a href="/account/authenticate/yahoo" class="socialSignIn yahoo" title="Log in with Yahoo"><img src="/content/v/2ff11e08ba40/shared/img/auth-yahoo.png" width="36" height="36" alt="Sign up with Yahoo" title="Sign up with Yahoo" /></a>
-    </div>
-    
-    <script type="text/javascript">
-        var socialSignInLinks = $('a.socialSignIn');
-        socialSignInLinks.attr("href", function(i,v){
-            return v + '?js=1';
-        });
-        socialSignInLinks.click(function(){
-            _gaq.push(['_trackEvent', 'action', 'login', 'top-bar']);
-            return true;
-        });
-    </script>
-</div>
-    
+        if row[8] >= j*fare_bracket_size\
+            and row[8] < (j+1)*fare_bracket_size:     # If passed these tests then loop through
+                                                      # each bin until you find the right one
+                                                      # append it to the bin_fare
+                                                      # and move to the next loop
+            bin_fare = j
+            break
+        # Now I have the binned fare, passenger class, and whether female or male, we can
+        # just cross ref their details with our survival table
+    if row[3] == 'female':
+        predictions_file_object.writerow([row[0], "%d" % int(survival_table[ 0, float(row[1]) - 1, bin_fare ])])
+    else:
+        predictions_file_object.writerow([row[0], "%d" % int(survival_table[ 1, float(row[1]) - 1, bin_fare])])
 
-<form action="/account/login" id="signin" method="post"><input id="returnUrl" name="returnUrl" type="hidden" value="https://www.kaggle.com/account/login?ReturnUrl=%2fc%2ftitanic%2fdownload%2fgenderclassmodel.py" /><input data-val="true" data-val-length="The field User name must be a string with a minimum length of 2 and a maximum length of 255." data-val-length-max="255" data-val-length-min="2" data-val-required="The User name field is required." id="UserName" name="UserName" placeholder="Email / username" type="text" value="" /><span class="field-validation-valid" data-valmsg-for="UserName" data-valmsg-replace="true"></span><input data-val="true" data-val-length="The field Password must be a string with a minimum length of 1 and a maximum length of 255." data-val-length-max="255" data-val-length-min="1" data-val-required="The Password field is required." id="Password" name="Password" placeholder="Password" type="password" /><span class="field-validation-valid" data-valmsg-for="Password" data-valmsg-replace="true"></span>    <div id="remember-me">
-        <input data-val="true" data-val-required="The Remember me? field is required." id="RememberMe" name="RememberMe" type="checkbox" value="true" /><input name="RememberMe" type="hidden" value="false" />            
-        <label for="RememberMe">Remember me?</label>
-    </div>   
-    <input type="submit" value="Login" />
-<input name="__RequestVerificationToken" type="hidden" value="PO6qQZfJDZFqQ-FssPWsTi2sO9fSyNtizM11tK0VLXifjW2EFr9R2Dv2NMCBNcl7bJdJgR4Qq6b34h8ONeDcwUK7Vj41" />    <input id="signinjs" type="hidden" name="JavaScriptEnabled" value="false" />    
-</form>
-<script type="text/javascript">
-    $('#signinjs').attr('value', 'true');
-    $('#signin').submit(function () { _gaq.push(['_trackEvent', 'action', 'login', 'top-bar']); });
-</script>
-
-<div id="forgot-links">        
-    Forgot your <a href="/forgot/username">Username</a> 
-    / 
-    <a href="/forgot/password">Password</a>?
-</div>
-
-            </div>
-            <script>
-                jQuery(function () {
-                    jQuery('.login-link').click(function (e) {
-                        e.preventDefault();
-                        jQuery('#top-bar-signin').toggle();
-                        jQuery('#menu-open-overlay').toggle();
-                        if (jQuery('#top-bar-signin').is(":visible")) {
-                            jQuery('#UserName').focus();
-                        }
-                    });
-                });
-            </script>
-    </div>
-</div>
-
-
-
-
-
-
-
-        
-
-        <!-- header-inside and header -->
-
-<div id="standalone-signin">
-    <div class="validation-summary-valid" data-valmsg-summary="true"><ul><li style="display:none"></li>
-</ul></div>
-    <form action="/account/login" id="login-account" method="post">    <fieldset id="social-authentication">
-        <a href="/account/authenticate/facebook" class="standaloneSocialSignIn" title="Login with Facebook"><img width='95' height="95" src="/content/v/368347303d78/shared/img/auth-facebook.png" alt="Login with Facebook" /></a>
-        <a href="/account/authenticate/google" class="standaloneSocialSignIn" title="Login with Google"><img width='95' height="95" src="/content/v/ace060e512d3/shared/img/auth-google.png" alt="Login with Google" /></a>
-        <a href="/account/authenticate/yahoo" class="standaloneSocialSignIn" title="Login with Yahoo"><img width='95' height="95" src="/content/v/2ff11e08ba40/shared/img/auth-yahoo.png" alt="Login with Yahoo" /></a>
-        
-    </fieldset> 
-<script type="text/javascript">
-        var standaloneSocialSignInLinks = $('a.standaloneSocialSignIn');
-        standaloneSocialSignInLinks.attr("href", function(i,v){
-            return v + '?js=1';
-        });
-        standaloneSocialSignInLinks.click(function(){
-            _gaq.push(['_trackEvent', 'action', 'login', 'standalone']);
-            return true;
-        });
-    </script>    <fieldset>
-        
-        <div class="field">
-            <label>Email / username</label>
-            <a href="/forgot/username" class="field-forgot-link" tabindex="4">Forgot username?</a>
-            <input data-val="true" data-val-length="The field User name must be a string with a minimum length of 2 and a maximum length of 255." data-val-length-max="255" data-val-length-min="2" data-val-required="The User name field is required." id="UserName" name="UserName" tabindex="1" type="text" value="" />
-            <span class="field-validation-valid" data-valmsg-for="UserName" data-valmsg-replace="true"></span>
-        </div>
-
-        <div class="field">
-            <label for="Password">Password</label>
-            <a href="/forgot/password" class="field-forgot-link" tabindex="5">Forgot password?</a>
-            <input data-val="true" data-val-length="The field Password must be a string with a minimum length of 1 and a maximum length of 255." data-val-length-max="255" data-val-length-min="1" data-val-required="The Password field is required." id="Password" name="Password" tabindex="2" type="password" />
-            <span class="field-validation-valid" data-valmsg-for="Password" data-valmsg-replace="true"></span>
-        </div>
-
-        <div id="remember-me">
-            <input data-val="true" data-val-required="The Remember me? field is required." id="RememberMe" name="RememberMe" type="checkbox" value="true" /><input name="RememberMe" type="hidden" value="false" />
-            <span>Remember me</span>
-        </div>   
-
-        <div class="field">
-            <input id="get-started" type="submit" value = "Login" tabindex="3" />
-            <input id="standalonesigninjs" type="hidden" name="JavaScriptEnabled" value="false" />
-        </div>
-          
-    </fieldset>   
-</form>
-<script type="text/javascript">
-    $('#standalonesigninjs').attr('value', 'true');
-    $('#login-account').submit(function () { _gaq.push(['_trackEvent', 'action', 'login', 'standalone']); });
-</script>
-
-<div id="login-page-signup" class="no-oauth">
-    <label><a href="/account/register" tabindex="6">Create an account &raquo;</a></label>
-</div>
- 
-
-
-</div>
-    </div> <!-- wrap -->
-    
-        <div id="footer">
-            <div id="footer-inside">
-                <div id="footer-social">
-                        <div id="social-links">
-            <a class="twitter" href="http://www.twitter.com/kaggle" title="Follow Kaggle on Twitter"></a>     
-                    <a class="facebook" href="http://www.facebook.com/kaggle" title="Follow Kaggle on Facebook"></a>           
-                    <a class="linkedin" href="http://www.linkedin.com/companies/kaggle" title="Follow Kaggle on LinkedIn"></a>        
-    </div><!-- social-links -->
-
-                </div>
-                <div id="footer-copyright">
-                    
-
-
-&copy; 2016 Kaggle Inc                </div>
-                <div id="footer-links">
-                    <a href="/team">Our Team</a>
-<a href="/careers">Careers</a>
-<a href="/terms">Terms</a>
-<a href="/privacy">Privacy</a> 
-<!--<a href="/Home/ContactPress">Press</a>-->
-<a href="/contact">Contact/Support</a>
-                </div> <!-- footer-links -->
-            </div> <!-- footer-inside -->
-        </div> <!--footer-->
-
-        
-        <script type="text/javascript">
-            var _gaq = _gaq || [];
-            _gaq.push(['_setAccount', 'UA-12629138-1']);
-            _gaq.push(['_trackPageview']);
-            _gaq.push(['_trackPageLoadTime']);
-            _gaq.push(['_setCustomVar', 1, 'usertype', 'anonymous', 2]);
-            (function () {
-                var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
-                ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
-                var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
-            })();
-        </script>
-        <script type="text/javascript">
-            /**
-        * Function that tracks a click on an outbound link in Google Analytics.
-        * This function takes a valid URL string as an argument, and uses that URL string
-        * as the event label.
-        * See: https://support.google.com/analytics/answer/1136920?hl=en
-        */
-            var trackOutboundLink = function(url) {
-                ga('send', 'event', 'outbound', 'click', url, {'hitCallback':
-                        function () {
-                            document.location = url;
-                        }
-                });
-            }
-        </script>
-
-
-    
-
-    <!-- Cheers, RD00155D486537p. -->
-</body>
-</html>
+# Close out the files
+test_file.close()
+predictions_file.close()
